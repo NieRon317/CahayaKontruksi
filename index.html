@@ -154,10 +154,10 @@
         .doc-total td { font-weight: bold; }
         .doc-terbilang { border: 1px solid #000; width: 52%; margin-top: 12px; padding: 3px 6px; font-size: 13px; }
         .doc-sign { margin: 18px 0 0 30px; font-size: 13px; }
-        .doc-sign .ruang { height: 90px; }
-        .doc-sign .nama { display: inline-block; min-width: 170px; border-top: 1px solid #000; }
+        .doc-sign .ruang { height: 95px; }
+        .doc-sign .nama { width: 200px; height: 22px; border-bottom: 1px solid #000; }
 
-        @media (max-width: 720px) {
+        @media screen and (max-width: 720px) {
             body { padding: 10px; }
             .container { padding: 15px; }
             .invoice-header, .filter-bar { grid-template-columns: 1fr; }
@@ -169,12 +169,12 @@
             .doc-terbilang { width: 100%; box-sizing: border-box; }
         }
 
-        @page { size: A4; margin: 12mm; }
+        @page { size: A4; margin: 0; }
         @media print {
             body { background: #fff; padding: 0; }
             .container, .no-print, #login-screen { display: none !important; }
             .modal-overlay { position: static; background: none; padding: 0; display: block !important; overflow: visible; }
-            .modal-box { box-shadow: none; max-width: 100%; padding: 0; }
+            .modal-box { box-shadow: none; max-width: 100%; margin: 0; padding: 12mm; border-radius: 0; }
         }
     </style>
 </head>
@@ -219,8 +219,10 @@
             <form id="form-invoice" onsubmit="submitInvoice(event)">
                 <div class="invoice-header">
                     <div class="form-group">
-                        <label>Tanggal Invoice</label>
-                        <input type="date" id="tanggal_invoice" required>
+                        <label>Tanggal Invoice (DDMMYYYY)</label>
+                        <input type="text" id="tanggal_invoice" inputmode="numeric" maxlength="8" placeholder="contoh: 23102026"
+                               autocomplete="off" oninput="cekTanggal()" required>
+                        <div id="tgl-preview" style="font-size:12.5px;color:#777;margin-top:4px;min-height:16px;"></div>
                     </div>
                     <div class="form-group">
                         <label>Nomor Invoice</label>
@@ -372,6 +374,28 @@
         let d = new Date();
         let p = n => String(n).padStart(2, "0");
         return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+    }
+    function hariIniDMY() {
+        let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(hariIni());
+        return m[3] + m[2] + m[1];
+    }
+    // "23102026" -> "2026-10-23" (kosong kalau tidak valid)
+    function dmyKeIso(s) {
+        let m = /^(\d{2})(\d{2})(\d{4})$/.exec(String(s || "").trim());
+        if (!m) return "";
+        let d = parseInt(m[1], 10), b = parseInt(m[2], 10), y = parseInt(m[3], 10);
+        let t = new Date(y, b - 1, d);
+        if (t.getFullYear() !== y || t.getMonth() !== b - 1 || t.getDate() !== d) return "";
+        return m[3] + "-" + m[2] + "-" + m[1];
+    }
+    function cekTanggal() {
+        let el = document.getElementById("tanggal_invoice");
+        el.value = el.value.replace(/\D/g, "").slice(0, 8);
+        let pv = document.getElementById("tgl-preview");
+        if (el.value.length < 8) { pv.textContent = ""; pv.style.color = "#777"; return; }
+        let iso = dmyKeIso(el.value);
+        pv.textContent = iso ? "= " + tglCetak(iso) : "Tanggal tidak valid";
+        pv.style.color = iso ? "#1e7e34" : "#c0392b";
     }
     function tglCetak(s) {
         let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || "");
@@ -639,7 +663,8 @@
     }
     function resetForm() {
         document.getElementById("form-invoice").reset();
-        document.getElementById("tanggal_invoice").value = hariIni();
+        document.getElementById("tanggal_invoice").value = hariIniDMY();
+        cekTanggal();
         let list = document.getElementById("container-item-list");
         list.innerHTML = "";
         for (let i = 0; i < BARIS_AWAL_FORM; i++) tambahBaris();
@@ -666,9 +691,12 @@
         if (salah) { showStatus("⚠️ " + salah, "error", 6000); return; }
         if (items.length === 0) { showStatus("⚠️ Isi minimal 1 baris barang.", "error", 6000); return; }
 
+        let tglIso = dmyKeIso(document.getElementById("tanggal_invoice").value);
+        if (!tglIso) { showStatus("⚠️ Tanggal invoice harus 8 angka format DDMMYYYY, contoh 23102026.", "error", 6000); return; }
+
         let payload = {
             aksi: "simpan_invoice",
-            tanggal_invoice: document.getElementById("tanggal_invoice").value,
+            tanggal_invoice: tglIso,
             nama_pelanggan: document.getElementById("nama_pelanggan").value.trim(),
             alamat_pelanggan: document.getElementById("alamat_pelanggan").value.trim(),
             items: items
@@ -825,6 +853,7 @@
             <div class="doc-sign">
                 Hormat kami,
                 <div class="ruang"></div>
+                <div class="nama"></div>
             </div>
         `;
         document.getElementById("modal-invoice").style.display = "block";

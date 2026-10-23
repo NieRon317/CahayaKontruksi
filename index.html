@@ -219,8 +219,8 @@
             <form id="form-invoice" onsubmit="submitInvoice(event)">
                 <div class="invoice-header">
                     <div class="form-group">
-                        <label>Tanggal Invoice (DDMMYYYY)</label>
-                        <input type="text" id="tanggal_invoice" inputmode="numeric" maxlength="8" placeholder="contoh: 23102026"
+                        <label>Tanggal Invoice (DD/MM/YYYY)</label>
+                        <input type="text" id="tanggal_invoice" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY"
                                autocomplete="off" oninput="cekTanggal()" required>
                         <div id="tgl-preview" style="font-size:12.5px;color:#777;margin-top:4px;min-height:16px;"></div>
                     </div>
@@ -377,11 +377,11 @@
     }
     function hariIniDMY() {
         let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(hariIni());
-        return m[3] + m[2] + m[1];
+        return m[3] + "/" + m[2] + "/" + m[1];
     }
     // "23102026" -> "2026-10-23" (kosong kalau tidak valid)
     function dmyKeIso(s) {
-        let m = /^(\d{2})(\d{2})(\d{4})$/.exec(String(s || "").trim());
+        let m = /^(\d{2})(\d{2})(\d{4})$/.exec(String(s || "").replace(/\D/g, ""));
         if (!m) return "";
         let d = parseInt(m[1], 10), b = parseInt(m[2], 10), y = parseInt(m[3], 10);
         let t = new Date(y, b - 1, d);
@@ -390,9 +390,11 @@
     }
     function cekTanggal() {
         let el = document.getElementById("tanggal_invoice");
-        el.value = el.value.replace(/\D/g, "").slice(0, 8);
+        let dg = el.value.replace(/\D/g, "").slice(0, 8);
+        // sisipkan "/" otomatis: 23102026 -> 23/10/2026
+        el.value = [dg.slice(0, 2), dg.slice(2, 4), dg.slice(4, 8)].filter(x => x !== "").join("/");
         let pv = document.getElementById("tgl-preview");
-        if (el.value.length < 8) { pv.textContent = ""; pv.style.color = "#777"; return; }
+        if (dg.length < 8) { pv.textContent = ""; pv.style.color = "#777"; return; }
         let iso = dmyKeIso(el.value);
         pv.textContent = iso ? "= " + tglCetak(iso) : "Tanggal tidak valid";
         pv.style.color = iso ? "#1e7e34" : "#c0392b";
@@ -692,7 +694,7 @@
         if (items.length === 0) { showStatus("⚠️ Isi minimal 1 baris barang.", "error", 6000); return; }
 
         let tglIso = dmyKeIso(document.getElementById("tanggal_invoice").value);
-        if (!tglIso) { showStatus("⚠️ Tanggal invoice harus 8 angka format DDMMYYYY, contoh 23102026.", "error", 6000); return; }
+        if (!tglIso) { showStatus("⚠️ Tanggal invoice harus berformat DD/MM/YYYY, contoh 23/10/2026.", "error", 6000); return; }
 
         let payload = {
             aksi: "simpan_invoice",

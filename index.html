@@ -169,9 +169,9 @@
             .doc-terbilang { width: 100%; box-sizing: border-box; }
         }
 
-        @page { size: A4; margin: 0; }
+        @page { size: A4 portrait; margin: 0; }
         @media print {
-            body { background: #fff; padding: 0; }
+            html, body { margin: 0; background: #fff; padding: 0; }
             .container, .no-print, #login-screen { display: none !important; }
             .modal-overlay { position: static; background: none; padding: 0; display: block !important; overflow: visible; }
             .modal-box { box-shadow: none; max-width: 100%; margin: 0; padding: 12mm; border-radius: 0; }
@@ -219,10 +219,8 @@
             <form id="form-invoice" onsubmit="submitInvoice(event)">
                 <div class="invoice-header">
                     <div class="form-group">
-                        <label>Tanggal Invoice (DD/MM/YYYY)</label>
-                        <input type="text" id="tanggal_invoice" inputmode="numeric" maxlength="10" placeholder="DD/MM/YYYY"
-                               autocomplete="off" oninput="cekTanggal()" required>
-                        <div id="tgl-preview" style="font-size:12.5px;color:#777;margin-top:4px;min-height:16px;"></div>
+                        <label>Tanggal Invoice</label>
+                        <input type="date" id="tanggal_invoice" required>
                     </div>
                     <div class="form-group">
                         <label>Nomor Invoice</label>
@@ -319,7 +317,7 @@
 <div class="modal-overlay" id="modal-invoice">
     <div class="modal-box">
         <div class="modal-actions no-print">
-            <button class="btn" onclick="window.print()">🖨️ Cetak</button>
+            <button class="btn" onclick="cetakDokumen()">🖨️ Cetak</button>
             <button class="btn btn-gray" onclick="tutupInvoice()">✖ Tutup</button>
         </div>
         <div id="invoice-isi"></div>
@@ -374,30 +372,6 @@
         let d = new Date();
         let p = n => String(n).padStart(2, "0");
         return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
-    }
-    function hariIniDMY() {
-        let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(hariIni());
-        return m[3] + "/" + m[2] + "/" + m[1];
-    }
-    // "23102026" -> "2026-10-23" (kosong kalau tidak valid)
-    function dmyKeIso(s) {
-        let m = /^(\d{2})(\d{2})(\d{4})$/.exec(String(s || "").replace(/\D/g, ""));
-        if (!m) return "";
-        let d = parseInt(m[1], 10), b = parseInt(m[2], 10), y = parseInt(m[3], 10);
-        let t = new Date(y, b - 1, d);
-        if (t.getFullYear() !== y || t.getMonth() !== b - 1 || t.getDate() !== d) return "";
-        return m[3] + "-" + m[2] + "-" + m[1];
-    }
-    function cekTanggal() {
-        let el = document.getElementById("tanggal_invoice");
-        let dg = el.value.replace(/\D/g, "").slice(0, 8);
-        // sisipkan "/" otomatis: 23102026 -> 23/10/2026
-        el.value = [dg.slice(0, 2), dg.slice(2, 4), dg.slice(4, 8)].filter(x => x !== "").join("/");
-        let pv = document.getElementById("tgl-preview");
-        if (dg.length < 8) { pv.textContent = ""; pv.style.color = "#777"; return; }
-        let iso = dmyKeIso(el.value);
-        pv.textContent = iso ? "= " + tglCetak(iso) : "Tanggal tidak valid";
-        pv.style.color = iso ? "#1e7e34" : "#c0392b";
     }
     function tglCetak(s) {
         let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || "");
@@ -665,8 +639,7 @@
     }
     function resetForm() {
         document.getElementById("form-invoice").reset();
-        document.getElementById("tanggal_invoice").value = hariIniDMY();
-        cekTanggal();
+        document.getElementById("tanggal_invoice").value = hariIni();
         let list = document.getElementById("container-item-list");
         list.innerHTML = "";
         for (let i = 0; i < BARIS_AWAL_FORM; i++) tambahBaris();
@@ -693,8 +666,8 @@
         if (salah) { showStatus("⚠️ " + salah, "error", 6000); return; }
         if (items.length === 0) { showStatus("⚠️ Isi minimal 1 baris barang.", "error", 6000); return; }
 
-        let tglIso = dmyKeIso(document.getElementById("tanggal_invoice").value);
-        if (!tglIso) { showStatus("⚠️ Tanggal invoice harus berformat DD/MM/YYYY, contoh 23/10/2026.", "error", 6000); return; }
+        let tglIso = document.getElementById("tanggal_invoice").value;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(tglIso)) { showStatus("⚠️ Tanggal invoice belum diisi.", "error", 6000); return; }
 
         let payload = {
             aksi: "simpan_invoice",
@@ -789,6 +762,7 @@
 
     function bukaDokumen(inv) {
         if (!inv) return;
+        docAktif = inv;
 
         let baris = inv.items.map((it, i) => `
             <tr>
@@ -859,6 +833,13 @@
             </div>
         `;
         document.getElementById("modal-invoice").style.display = "block";
+    }
+    let docAktif = null;
+    function cetakDokumen() {
+        let judulAsli = document.title;
+        if (docAktif) document.title = "Invoice " + String(docAktif.no_invoice).replace(/\//g, "-");   // juga jadi nama file kalau Save as PDF
+        window.addEventListener("afterprint", () => { document.title = judulAsli; }, { once: true });
+        window.print();
     }
     function tutupInvoice() {
         document.getElementById("modal-invoice").style.display = "none";
